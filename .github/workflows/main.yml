@@ -35,13 +35,39 @@ jobs:
       - name: Clone OpenWrt
         run: |
           git clone --branch v24.10.8 --depth 1 https://github.com/openwrt/openwrt.git
-          cd openwrt
 
       - name: Update feeds
         working-directory: openwrt
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+      - name: Add DDNSTO
+        working-directory: openwrt
+        env:
+          DDNSTO_TOKEN: ${{ secrets.DDNSTO_TOKEN }}
+        run: |
+          git clone --depth 1 https://github.com/linkease/ddnsto-openwrt-package.git /tmp/ddnsto
+          cp -r /tmp/ddnsto/ddnsto package/ddnsto
+
+          python3 - <<'PY'
+          import os
+
+          token = os.environ["DDNSTO_TOKEN"]
+          token = token.replace("\\", "\\\\").replace('"', '\\"')
+
+          config = f"""config ddnsto
+          option enabled '1'
+          option token "{token}"
+          option index '0'
+          option logger '0'
+          option feat_enabled '0'
+          option feat_port '3033'
+          """
+
+          with open("package/ddnsto/files/ddnsto.config", "w") as f:
+              f.write(config)
+          PY
 
       - name: Configure OpenWrt
         working-directory: openwrt
@@ -55,6 +81,8 @@ jobs:
           CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
           CONFIG_PACKAGE_luci-ssl-openssl=y
           CONFIG_PACKAGE_luci-theme-bootstrap=y
+
+          CONFIG_PACKAGE_ddnsto=y
 
           CONFIG_PACKAGE_openssh-server=y
           CONFIG_PACKAGE_curl=y
